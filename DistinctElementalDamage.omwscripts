@@ -1,3 +1,6 @@
+MENU: scripts/DistinctElementalDamage/utils/multiCheckbox.lua
+MENU: scripts/DistinctElementalDamage/utils/SuperSelect3.lua
+
 MENU: scripts/DistinctElementalDamage/settingsMenu.lua
 GLOBAL: scripts/DistinctElementalDamage/settingsGlobal.lua
 PLAYER, NPC, CREATURE: scripts/DistinctElementalDamage/actor.lua
