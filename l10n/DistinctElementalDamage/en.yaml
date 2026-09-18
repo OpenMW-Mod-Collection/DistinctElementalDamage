@@ -1,0 +1,22 @@
+page_name: Distinct Elemental Damage
+page_description: Gives elemental damage effects secondary effects.
+
+settings_groupName: Settings
+settings_groupDesc: Changing settings while under elemental damage effects will cause issues.
+fireEffectiveness_name: "Fire: Physical Weakness"
+fireEffectiveness_desc: |
+  While burning, each point of fire damage increases physical damage taken by this fraction.
+  
+  0.01 = +1% physical damage per point of fire magnitude
+frostEffectiveness_name: "Frost: Speed Drain"
+frostEffectiveness_desc: |
+  Each point of frost damage drains this many speed points for as long as the effect lasts, then restores fully when it ends.
+
+  Overrides Restore Speed while active.
+shockEffectiveness_name: "Shock: Magicka Damage"
+shockEffectiveness_desc: >
+  Each point of shock damage per second also damages this many magicka points per second, on top of the base effect.
+poisonEffectiveness_name: "Poison: More Health Damage"
+poisonEffectiveness_desc: >
+  Each point of poison damage per second deals this much extra health damage per second, on top of the base effect.
+log_name: Enable Logging
