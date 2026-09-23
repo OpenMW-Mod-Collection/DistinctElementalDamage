@@ -1,5 +1,8 @@
 page_name: Distinct Elemental Damage
-page_description: Gives elemental damage effects secondary effects.
+page_description: |
+  Gives elemental damage effects secondary effects.
+
+  All settings are safe to change even mid-fight!
 
 common_groupName: Common
 enable_name: Enable Secondary Effects for
@@ -8,7 +11,18 @@ frost: Frost
 shock: Shock
 poison: Poison
 presets_name: Presets
-presets_desc: "[more details about presets idk]"
+presets_desc: |
+  Default:
+  - Fire - Physical Weakness
+  - Frost - Drain Speed
+  - Shock - Damage Magicka
+  - Poison - Damage Health
+
+  Natural:
+  - Fire - Damage Health
+  - Frost - Damage Fatigue
+  - Shock - Damage Magicka
+  - Poison - Physical Weakness
 log_name: Enable Logging
 
 fire_groupName: Fire
@@ -22,4 +36,4 @@ magnitudeScale_desc: |
 
   Drain Speed: 1 = -1 Speed per point of effect magnitude
 
-  Damage Health/Magicka/Fatigue: 1 = -1 Stat per point of effect magnitude
+  Damage Stat: 1 = -1 Stat/sec per point of effect magnitude

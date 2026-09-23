@@ -1,19 +1,35 @@
 ---@omw-context global
 local I = require('openmw.interfaces')
 
-local secondaryEffectsList = {
-    "Physical Weakness",
-    "Drain Speed",
-    "Damage Health",
-    "Damage Magicka",
-    "Damage Fatigue",
-}
-local secondaryEffectsTable = {
-    ["Physical Weakness"] = "Physical Weakness",
-    ["Drain Speed"]       = "Drain Speed",
-    ["Damage Health"]     = "Damage Health",
-    ["Damage Magicka"]    = "Damage Magicka",
-    ["Damage Fatigue"]    = "Damage Fatigue",
+local SettingsPresets = require('scripts.DistinctElementalDamage.utils.presetManager')
+local Shared = require("scripts.DistinctElementalDamage.shared")
+
+local presets = SettingsPresets.register {
+    selector = {
+        section  = 'SettingsDistinctElementalDamage_common',
+        key      = 'presets',
+        isGlobal = true,
+    },
+    sections = {
+        SettingsDistinctElementalDamage_fire   = { isGlobal = true },
+        SettingsDistinctElementalDamage_frost  = { isGlobal = true },
+        SettingsDistinctElementalDamage_shock  = { isGlobal = true },
+        SettingsDistinctElementalDamage_poison = { isGlobal = true },
+    },
+    presets = {
+        Default = {
+            SettingsDistinctElementalDamage_fire   = { secondaryEffect = Shared.secondaryEffects.physicalWeakness, magnitudeScale = 0.02 },
+            SettingsDistinctElementalDamage_frost  = { secondaryEffect = Shared.secondaryEffects.drainSpeed, magnitudeScale = 1 },
+            SettingsDistinctElementalDamage_shock  = { secondaryEffect = Shared.secondaryEffects.damageMagicka, magnitudeScale = 0.75 },
+            SettingsDistinctElementalDamage_poison = { secondaryEffect = Shared.secondaryEffects.damageHealth, magnitudeScale = 0.5 },
+        },
+        Natural = {
+            SettingsDistinctElementalDamage_fire   = { secondaryEffect = Shared.secondaryEffects.damageHealth, magnitudeScale = 0.5 },
+            SettingsDistinctElementalDamage_frost  = { secondaryEffect = Shared.secondaryEffects.damageFatigue, magnitudeScale = 3 },
+            SettingsDistinctElementalDamage_shock  = { secondaryEffect = Shared.secondaryEffects.damageMagicka, magnitudeScale = 0.75 },
+            SettingsDistinctElementalDamage_poison = { secondaryEffect = Shared.secondaryEffects.physicalWeakness, magnitudeScale = 0.04 },
+        },
+    },
 }
 
 I.Settings.registerGroup {
@@ -52,11 +68,7 @@ I.Settings.registerGroup {
             renderer = "SuperSelect3",
             default = "Default",
             argument = {
-                items = {
-                    "Default",
-                    "Natural",
-                    "Custom"
-                },
+                items = presets.names(),
                 width = 100,
             },
         },
@@ -69,6 +81,14 @@ I.Settings.registerGroup {
     }
 }
 
+
+local secondaryEffectsList = {
+    Shared.secondaryEffects.physicalWeakness,
+    Shared.secondaryEffects.drainSpeed,
+    Shared.secondaryEffects.damageHealth,
+    Shared.secondaryEffects.damageMagicka,
+    Shared.secondaryEffects.damageFatigue,
+}
 local function newElementSection(effectName, order, secondaryEffect, magnitudeScale)
     I.Settings.registerGroup {
         key = 'SettingsDistinctElementalDamage_' .. effectName,
@@ -99,7 +119,7 @@ local function newElementSection(effectName, order, secondaryEffect, magnitudeSc
     }
 end
 
-newElementSection("fire", 1, secondaryEffectsTable["Physical Weakness"], 0.02)
-newElementSection("frost", 2, secondaryEffectsTable["Drain Speed"], 1)
-newElementSection("shock", 3, secondaryEffectsTable["Damage Magicka"], 0.75)
-newElementSection("poison", 4, secondaryEffectsTable["Damage Health"], 0.5)
+newElementSection("fire", 1, "Physical Weakness", 0.02)
+newElementSection("frost", 2, "Drain Speed", 1)
+newElementSection("shock", 3, "Damage Magicka", 0.75)
+newElementSection("poison", 4, "Damage Health", 0.5)

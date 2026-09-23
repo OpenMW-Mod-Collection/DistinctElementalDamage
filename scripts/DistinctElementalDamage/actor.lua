@@ -15,28 +15,28 @@ elseif core.API_REVISION < 144 then
     return
 end
 
-local settingsCache = require("scripts.DistinctElementalDamage.utils.settingsCache")
+local SettingsCache = require("scripts.DistinctElementalDamage.utils.settingsCache")
+local Shared = require("scripts.DistinctElementalDamage.shared")
 
-local settingsCommon = settingsCache.new(
+local recalculateAllEffects
+local settingsCommon = SettingsCache.new(
     storage.globalSection("SettingsDistinctElementalDamage_common"),
-    async
+    async,
+    recalculateAllEffects
 )
-local settingsFire = settingsCache.new(
-    storage.globalSection("SettingsDistinctElementalDamage_fire"),
-    async
-)
-local settingsFrost = settingsCache.new(
-    storage.globalSection("SettingsDistinctElementalDamage_frost"),
-    async
-)
-local settingsShock = settingsCache.new(
-    storage.globalSection("SettingsDistinctElementalDamage_shock"),
-    async
-)
-local settingsPoison = settingsCache.new(
-    storage.globalSection("SettingsDistinctElementalDamage_poison"),
-    async
-)
+local function newEffectSettings(effect)
+    return SettingsCache.new(
+        storage.globalSection("SettingsDistinctElementalDamage_" .. effect),
+        async,
+        recalculateAllEffects
+    )
+end
+local settingsByEffect = {
+    [core.magic.EFFECT_TYPE.FireDamage] = newEffectSettings("fire"),
+    [core.magic.EFFECT_TYPE.FrostDamage] = newEffectSettings("frost"),
+    [core.magic.EFFECT_TYPE.ShockDamage] = newEffectSettings("shock"),
+    [core.magic.EFFECT_TYPE.Poison] = newEffectSettings("poison"),
+}
 
 local selfEffects = self.type.activeEffects(self)
 local selfMagicka = self.type.stats.dynamic.magicka(self)
@@ -44,8 +44,11 @@ local selfHealth = self.type.stats.dynamic.health(self)
 local selfFatigue = self.type.stats.dynamic.fatigue(self)
 local selfSpeed = self.type.stats.attributes.speed(self)
 
-local fireDamageMult = 1    -- TODO allow overlapping effect support
-local frostSpeedDamageApplied = 0    -- TODO allow overlapping effect support
+local physicalWeaknessMult = {}
+local drainSpeedApplied = {}
+local totalPhysicalWeakness = 1
+local drainSpeedTotalApplied = 0
+
 local activeElementalEffects = {}
 local elementalEffectsActive = true -- setting it to true so that the first update will check for active effects
 
@@ -55,76 +58,124 @@ local function log(msg, ...)
     end
 end
 
-local function damageStat(magnitude, dt, stat)
+local function damageStat(magnitude, dt, stat, statLogPrefix)
     local damagedStat = stat.current - magnitude * dt
     stat.current = math.max(damagedStat, 0)
-    log("ShockDamage: magnitude=%.2f magicka.current=%.2f", magnitude, stat.current)    -- TODO rewrite logging
+    log(statLogPrefix .. " %s: magnitude=%.2f current=%.2f", self.recordId, magnitude, stat.current)
 end
 
+local function recomputePhysicalWeakness()
+    local total = 1
+    for _, mult in pairs(physicalWeaknessMult) do
+        total = total + mult
+    end
+    totalPhysicalWeakness = total
+    log("PhysicalWeakness %s: totalPhysicalWeakness=%.3f", self.recordId, totalPhysicalWeakness)
+end
+
+local function recomputeDrainSpeed()
+    local total = 0
+    for _, dmg in pairs(drainSpeedApplied) do
+        total = total + dmg
+    end
+    local delta = total - drainSpeedTotalApplied
+    selfSpeed.damage = math.max(selfSpeed.damage + delta, 0)
+    drainSpeedTotalApplied = total
+    log("DrainSpeed %s: delta=%.2f speed.damage=%.2f", self.recordId, delta, selfSpeed.damage)
+end
+
+recalculateAllEffects = function()
+    physicalWeaknessMult = {}
+    drainSpeedApplied = {}
+    local delta = 0 - drainSpeedTotalApplied
+    selfSpeed.damage = math.max(selfSpeed.damage + delta, 0)
+    drainSpeedTotalApplied = 0
+
+    recomputePhysicalWeakness()
+
+    activeElementalEffects = {}
+    elementalEffectsActive = true
+    log("recalculateAllEffects %s: all secondary effect state reset", self.recordId)
+end
+
+
+local function clearSecondaryEffectContribution(sourceEffect)
+    local settings = settingsByEffect[sourceEffect]
+    if settings.secondaryEffect == "Physical Weakness" then
+        if physicalWeaknessMult[sourceEffect] then
+            physicalWeaknessMult[sourceEffect] = nil
+            recomputePhysicalWeakness()
+        end
+    elseif settings.secondaryEffect == "Drain Speed" then
+        if drainSpeedApplied[sourceEffect] then
+            drainSpeedApplied[sourceEffect] = nil
+            recomputeDrainSpeed()
+        end
+    end
+end
+
+---@type table<string, function>
 local secondaryEffects = {
-    ["Physical Weakness"] = function(magnitude, dt)
-        fireDamageMult = 1 + magnitude
-        log("FireDamage: magnitude=%.2f -> fireDamageMult=%.3f", magnitude, fireDamageMult)
+    [Shared.secondaryEffects.physicalWeakness] = function(sourceEffect, magnitude, dt)
+        physicalWeaknessMult[sourceEffect] = magnitude
+        recomputePhysicalWeakness()
     end,
-    ["Drain Speed"] = function(magnitude, dt)
-        local delta = magnitude - frostSpeedDamageApplied
-        selfSpeed.damage = math.max(selfSpeed.damage + delta, 0)
-        frostSpeedDamageApplied = magnitude
-        log("FrostDamage: magnitude=%.2f delta=%.2f speed.damage=%.2f", magnitude, delta, selfSpeed.damage)
+    [Shared.secondaryEffects.drainSpeed] = function(sourceEffect, magnitude, dt)
+        drainSpeedApplied[sourceEffect] = magnitude
+        recomputeDrainSpeed()
     end,
-    ["Damage Health"] = function(magnitude, dt)
-        damageStat(magnitude, dt, selfHealth)
+    [Shared.secondaryEffects.damageHealth] = function(sourceEffect, magnitude, dt)
+        damageStat(magnitude, dt, selfHealth, "DamageHealth")
     end,
-    ["Damage Magicka"] = function(magnitude, dt)
-        damageStat(magnitude, dt, selfMagicka)
+    [Shared.secondaryEffects.damageMagicka] = function(sourceEffect, magnitude, dt)
+        damageStat(magnitude, dt, selfMagicka, "DamageMagicka")
     end,
-    ["Damage Fatigue"] = function(magnitude, dt)
-        damageStat(magnitude, dt, selfFatigue)
+    [Shared.secondaryEffects.damageFatigue] = function(sourceEffect, magnitude, dt)
+        damageStat(magnitude, dt, selfFatigue, "DamageFatigue")
     end,
 }
 
-local function callSecondaryEffect(settings, magnitude, dt)
-    secondaryEffects[settings.secondaryEffect](magnitude * settings.magnitudeScale, dt)
+local function callSecondaryEffect(sourceEffect, magnitude, dt)
+    local settings = settingsByEffect[sourceEffect]
+    local secondaryEffectApplyer = secondaryEffects[settings.secondaryEffect]
+    local scaledMagnitude = magnitude * settings.magnitudeScale
+    secondaryEffectApplyer(sourceEffect, scaledMagnitude, dt)
 end
 
 local elementalEffects = {
     [core.magic.EFFECT_TYPE.FireDamage] = function(magnitude, dt)
         if not settingsCommon.enable.fire then return end
-        callSecondaryEffect(settingsFire, magnitude, dt)
+        callSecondaryEffect(core.magic.EFFECT_TYPE.FireDamage, magnitude, dt)
     end,
     [core.magic.EFFECT_TYPE.FrostDamage] = function(magnitude, dt)
         if not settingsCommon.enable.frost then return end
-        callSecondaryEffect(settingsFrost, magnitude, dt)
+        callSecondaryEffect(core.magic.EFFECT_TYPE.FrostDamage, magnitude, dt)
     end,
     [core.magic.EFFECT_TYPE.ShockDamage] = function(magnitude, dt)
         if not settingsCommon.enable.shock then return end
-        callSecondaryEffect(settingsShock, magnitude, dt)
+        callSecondaryEffect(core.magic.EFFECT_TYPE.ShockDamage, magnitude, dt)
     end,
     [core.magic.EFFECT_TYPE.Poison] = function(magnitude, dt)
         if not settingsCommon.enable.poison then return end
-        callSecondaryEffect(settingsPoison, magnitude, dt)
+        callSecondaryEffect(core.magic.EFFECT_TYPE.Poison, magnitude, dt)
     end,
 }
 
 local function checkElementalEffects()
     elementalEffectsActive = false
-    fireDamageMult = 1
     for effect, _ in pairs(elementalEffects) do
         local magnitude = selfEffects:getEffect(effect).magnitude
-        print(effect, magnitude)
         if magnitude > 0 then
             activeElementalEffects[effect] = magnitude
             elementalEffectsActive = true
         else
-            activeElementalEffects[effect] = nil
-            if effect == core.magic.EFFECT_TYPE.FrostDamage and frostSpeedDamageApplied > 0 then -- TODO
-                selfSpeed.damage = math.max(selfSpeed.damage - frostSpeedDamageApplied, 0)
-                frostSpeedDamageApplied = 0
-                log("FrostDamage effect ended, speed.damage reset")
+            if activeElementalEffects[effect] then
+                clearSecondaryEffectContribution(effect)
             end
+            activeElementalEffects[effect] = nil
         end
     end
-    log("checkElementalEffects: elementalEffectsActive=%s", tostring(elementalEffectsActive))
+    log("checkElementalEffects %s: elementalEffectsActive=%s", self.recordId, tostring(elementalEffectsActive))
 end
 
 local function onUpdate(dt)
@@ -142,13 +193,13 @@ end
 ---@param attack openmw.interfaces.Combat.AttackInfo
 ---@return table
 I.Combat.addOnHitHandler(function(attack)
-    if not attack.successful or not attack.damage.health or fireDamageMult == 1 then
+    if not attack.successful or not attack.damage.health or totalPhysicalWeakness == 1 then
         return
     end
 
     local before = attack.damage.health
-    attack.damage.health = attack.damage.health * fireDamageMult
-    log("onHit: health damage %.2f -> %.2f (fireDamageMult=%.3f)", before, attack.damage.health, fireDamageMult)
+    attack.damage.health = attack.damage.health * totalPhysicalWeakness
+    log("onHit %s: health damage %.2f -> %.2f (totalPhysicalWeakness=%.3f)", self.recordId, before, attack.damage.health, totalPhysicalWeakness)
 end)
 
 return {
@@ -156,12 +207,17 @@ return {
         onUpdate = onUpdate,
         onSave = function()
             return {
-                frostSpeedDamageApplied = frostSpeedDamageApplied
+                drainSpeedApplied = drainSpeedApplied
             }
         end,
         onLoad = function(data)
             data = data or {}
-            frostSpeedDamageApplied = data.frostSpeedDamageApplied or frostSpeedDamageApplied
+            drainSpeedApplied = data.drainSpeedApplied or drainSpeedApplied
+            local total = 0
+            for _, dmg in pairs(drainSpeedApplied) do
+                total = total + dmg
+            end
+            drainSpeedTotalApplied = total
         end
     },
     eventHandlers = {
