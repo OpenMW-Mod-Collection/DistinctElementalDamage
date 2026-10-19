@@ -1,10 +1,11 @@
----@diagnostic disable: missing-parameter
+---@diagnostic disable: missing-parameter, undefined-global
 ---@omw-context local
 local self = require("openmw.self")
 local core = require("openmw.core")
 local I = require("openmw.interfaces")
 local storage = require("openmw.storage")
 local async = require("openmw.async")
+local debug = require("openmw.debug")
 
 if self.type.isDead(self) then
     return
@@ -161,6 +162,8 @@ local elementalEffects = {
     end,
 }
 
+local onUpdate
+
 local function checkElementalEffects()
     elementalEffectsActive = false
     for effect, _ in pairs(elementalEffects) do
@@ -175,15 +178,23 @@ local function checkElementalEffects()
             activeElementalEffects[effect] = nil
         end
     end
+
+    if elementalEffectsActive then
+        onUpdate(core.getRealFrameDuration())
+    end
     log("checkElementalEffects %s: elementalEffectsActive=%s", self.recordId, tostring(elementalEffectsActive))
 end
 
-local function onUpdate(dt)
+function onUpdate(dt)
     if not elementalEffectsActive then
         return
     end
 
     checkElementalEffects()
+
+    if debug.isGodMode() then
+        return
+    end
 
     for effect, magnitude in pairs(activeElementalEffects) do
         elementalEffects[effect](magnitude, dt)

@@ -1,5 +1,10 @@
 # Distinct Elemental Damage (OpenMW)
 
+## 2.1
+
+- Fixed skipping the first frame when the efefct gets applied to the actors
+- Added support for godmode status
+
 ## 2.0
 
 - Greatly expanded the settings
