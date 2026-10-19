@@ -2,7 +2,7 @@
 
 ## 2.1
 
-- Fixed skipping the first frame when the efefct gets applied to the actors
+- Fixed skipping the first frame when the effect gets applied to the actors
 - Added support for godmode status
 
 ## 2.0
