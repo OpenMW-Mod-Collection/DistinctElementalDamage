@@ -5,7 +5,10 @@ local core = require("openmw.core")
 local I = require("openmw.interfaces")
 local storage = require("openmw.storage")
 local async = require("openmw.async")
-local debug = require("openmw.debug")
+local types = require("openmw.types")
+local debug = types.Player.objectIsInstance(self)
+    and require("openmw.debug")
+    or nil
 
 if self.type.isDead(self) then
     return
@@ -192,7 +195,7 @@ function onUpdate(dt)
 
     checkElementalEffects()
 
-    if debug.isGodMode() then
+    if debug and debug.isGodMode() then
         return
     end
 
