@@ -1,5 +1,9 @@
 # Distinct Elemental Damage (OpenMW)
 
+## 2.1.2
+
+- Fixed stack overflow when any elemental effect gets active
+
 ## 2.1.1
 
 - Fixed a debug module import breaking non-player scripts

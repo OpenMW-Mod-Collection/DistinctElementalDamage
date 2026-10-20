@@ -165,7 +165,15 @@ local elementalEffects = {
     end,
 }
 
-local onUpdate
+local function applyEffects(dt)
+    if debug and debug.isGodMode() then
+        return
+    end
+
+    for effect, magnitude in pairs(activeElementalEffects) do
+        elementalEffects[effect](magnitude, dt)
+    end
+end
 
 local function checkElementalEffects()
     elementalEffectsActive = false
@@ -181,27 +189,15 @@ local function checkElementalEffects()
             activeElementalEffects[effect] = nil
         end
     end
-
-    if elementalEffectsActive then
-        onUpdate(core.getRealFrameDuration())
-    end
     log("checkElementalEffects %s: elementalEffectsActive=%s", self.recordId, tostring(elementalEffectsActive))
 end
 
-function onUpdate(dt)
+local function onUpdate(dt)
     if not elementalEffectsActive then
         return
     end
-
     checkElementalEffects()
-
-    if debug and debug.isGodMode() then
-        return
-    end
-
-    for effect, magnitude in pairs(activeElementalEffects) do
-        elementalEffects[effect](magnitude, dt)
-    end
+    applyEffects(dt)
 end
 
 ---@param attack openmw.interfaces.Combat.AttackInfo
@@ -213,7 +209,8 @@ I.Combat.addOnHitHandler(function(attack)
 
     local before = attack.damage.health
     attack.damage.health = attack.damage.health * totalPhysicalWeakness
-    log("onHit %s: health damage %.2f -> %.2f (totalPhysicalWeakness=%.3f)", self.recordId, before, attack.damage.health, totalPhysicalWeakness)
+    log("onHit %s: health damage %.2f -> %.2f (totalPhysicalWeakness=%.3f)",
+        self.recordId, before, attack.damage.health, totalPhysicalWeakness)
 end)
 
 return {
@@ -238,6 +235,11 @@ return {
         ApplyMagicEffects = function()
             self:sendEvent("DistinctElementalDamage_delayedCheckEffects")
         end,
-        DistinctElementalDamage_delayedCheckEffects = checkElementalEffects
+        DistinctElementalDamage_delayedCheckEffects = function()
+            checkElementalEffects()
+            if elementalEffectsActive then
+                applyEffects(core.getRealFrameDuration())
+            end
+        end
     },
 }
